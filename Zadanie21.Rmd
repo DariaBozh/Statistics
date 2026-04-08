@@ -1,0 +1,105 @@
+---
+title: "Zadania_1"
+author: "Google gemini"
+date: "2026-03-12"
+output: html_document
+---
+
+## 1.1 Pearsonov korelacny koeficient
+
+```{r}
+x <- mtcars$hp #horse powers
+y <- mtcars$mpg #fuel consumption
+
+# overenie normality
+shapiro_hp <- shapiro.test(mtcars$hp)
+shapiro_mpg <- shapiro.test(mtcars$mpg)
+shapiro_hp
+shapiro_mpg
+
+pearson_corr <- cor(x, y, method = "pearson")
+print(pearson_corr)
+```
+
+Najprv overujeme ci ide o normalove rozdelenie, to je najlahsie urobit pomocou Sapiro-Vilkovoho testu. P-hodnota pre hp je trochu menej ako 0.05, tu rozdelenie nie je normalne , ale ten rozdiel je maalicky, takze uvazujme ho ako normalne ( asi to je ok :D). A teda pre mpg p-hodnota urcite vacsia.
+
+```{r}
+library(ggplot2)
+
+ggplot(mtcars, aes(x = hp, y = mpg)) +
+  geom_point(color = "lightgreen", size = 2) +        # Точки
+  labs(title = paste("Scatter plot for r =", round(pearson_corr, 2)),
+       x = "Horse powers (hp)",
+       y = "Miles per gallon (mpg)") +
+  theme_minimal()
+
+```
+
+V tomto pripade je lepsie pouzit Spearmanov koeficient, lebo on je odolnejsi voci odchylkam od normality, mozme vsak aj tento. Mame zaporny korelacny koeficien, a to znamena, ze mame opacnu zavislost premennych. Za abs. hodnotou je to cislo, co sa blizi k 1, teda mame silnu korelaciu.
+
+## 1.2 Test vyznamnosti korelacnoho koeficientu
+
+Teda ci existuje v realnom zivote ten vztah pre vsetky auta? Overujeme hypotezu H0 - korelacia je nulova, H1 - korelacia nie je nulova
+
+```{r}
+test_result <- cor.test(mtcars$hp, mtcars$mpg, method = "pearson")
+
+print(test_result)
+```
+
+P-hodnota je mensia ako 0.05, teda zamietame H0. To znamena, ze je ten vztah statisticky vyznamny.
+
+## 1.3 Spearmanov a Kendallov korelacny koeficient
+
+To su neparametricke metody hladania korelacii. Nie su take citlive na vykidy. Prvy pracuje s rangami matic a hlada hociaky monotonny vztah. Druhy je vhody vacsinou pre male statisticke subory.
+
+```{r}
+x <- mtcars$hp
+y <- mtcars$mpg
+
+spearman_corr <- cor(x, y, method = "spearman")
+print(paste("Spearman:", round(spearman_corr, 4)))
+
+kendall_corr <- cor(x, y, method = "kendall")
+print(paste("Kendall:", round(kendall_corr, 4)))
+```
+
+Spearmanov v absolutnej hodnote je vacsi ako Kendallov! To znamena, ze zavislost nie je celkom linearna, ona skor pripomina exponencialny pokles.
+
+## 1.4 Korelacna matica
+
+```{r}
+library(corrplot)
+
+m <- cor(iris[, 1:4])
+
+spring_colors <- colorRampPalette(c("#762A83", "#E7D4E8", "#F7F7F7", "#D9F0D3", "#1B7837"))(200)
+
+corrplot(m, 
+         method = "color",           # stvorceky
+         col = spring_colors,        # palitra
+         addCoef.col = "#2F4F4F",    # cifry 
+         tl.col = "black",           # nazvy 
+         outline = TRUE,             # ramec
+         diag = FALSE,               # vynechame diagonalu s jednotkami
+         mar = c(0,0,2,0),           # odstupy
+         title = "Korelacia Iris")
+```
+
+Korelaсna matica datasetu Iris ukazuje vemi silnu pozitívnu linearnu zavislost medzi premennymi Petal.Length a Petal.Width , kde je koeficient korelacie az 0.96. Tieto dve premenne taktiez silno koreluju s Sepal.Length. Naopak, Sepal.Width vykazuje slabu az negativnu korelaciu s ostatnymi premennymi, co naznacuje, ze sa vyvija nezavisle od velkosti okvetnych lístkov.
+
+## BONUS Parcialna korelacia
+
+Vypocet korelacii pre mpg a hp s odstranenim vplyvu wt (vaha)
+
+```{r}
+library(ppcor)
+
+# Cista korelacia
+result <- pcor.test(mtcars$mpg, mtcars$hp, mtcars$wt)
+print(paste("Parcialna korelacia:", round(result$estimate, 3)))
+```
+
+Ked obycajna korelacia je -0.776, a parcialna je menej, tak...
+
+Vykon a spotreba paliva su velmi silno prepojene. Vztah medzi nimi sa vsak vyrazne oslabil, ked sme odstranili vplyv hmotnosti. Výkonné auta su zvycajne tazke a tazke auta spotrebuvaju viac paliva.

@@ -1,0 +1,178 @@
+---
+title: "Zadania_2"
+output: html_document
+date: "2026-03-18"
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+## 2.1. Jednoduchá regresia
+
+Urobme linearny regresny model a overme predpoklady.
+
+```{r}
+model <- lm(dist ~ speed, data = cars)
+summary(model)
+
+# overenie predpokladov
+par(mfrow = c(2, 2))
+plot(model)
+```
+
+H0 - rychlost nema ziadny vplyv.
+beta=0.\
+H1 - rychlost ma vyznamny vplyv.
+beta!=
+0
+
+Multiple R-squared: vysvetluje 65% toho, co sa dje s drahou.\
+F statistika/riadok speed: p-value je ovela mensie ako 0.05 -\> zamietame H0.\
+Rychlost ma vplyv a pomaha predpovedat drahu\
+Potom ked zvacsime o 1 jednotku rychlost, tak predlzime drahu o cca 4 jednotki.
+
+*Ci splnene podmienky KLRM?* (linearita, normalnost chyb) Otestujeme statistiku.
+a vizualizujeme.
+
+Na grafe 1 vidime mierne zakrivenie(vrece), tu nie je uplne linearny vztah.
+A na Q-Q nie vsetky body sleduju priamku, takze nie su chyby z normalneho rozdelenia.
+Graf Scale-Location ukazuje mierne stupajuci trend, co moze naznacovat heteroskedasticitu.
+
+```{r}
+predikcie <- predict(model)
+
+# Nakreslime realne hodnoty a prelozime ich modelom 
+plot(cars$speed, cars$dist, main="Model", 
+     xlab="Rychlosť", ylab="Draha", pch=19)
+abline(model, col="blue", lwd=2) # Toto je ta nasa vypocitana priamka
+```
+
+No, tu su nelinearne vztahy.
+Da sa najst nieco lepsie?
+
+```{r}
+# skusime model s druhou mocninou 
+model2 <- lm(dist ~ speed + I(speed^2), data = cars)
+summary(model2)
+```
+
+Ano, da sa.
+Multiple R-squared: trochu vacsi.
+Brzdna draha rastie s druhou mocninou rychlosti.
+Teda je tu skor kvadraticky vztah.
+
+## 2.2. Násobná regresia – generované dáta
+
+Nájdite najvhodnejší lineárny regresný model.
+Overte predpoklady.
+Zdôvodnite prečo je model najvhodnejší.
+Testujte štatistickú významnosť modelu a parametrov.
+
+```{r}
+n <- 100
+size <- rnorm(n, mean = 2000, sd = 500) # House size
+
+bedrooms <- sample(2:5, n, replace = TRUE) # Number of bedrooms
+
+bathrooms <- sample(1:4, n, replace = TRUE) # Number of bathrooms
+
+age <- rpois(n, lambda = 10) # Age of the house
+
+price <- 50000 + size * 150 + bedrooms * 10000 - age * 2000 + rnorm(n, mean = 0, sd =
+30000) # Create target variable
+
+house_data <- data.frame( Size = size, Bedrooms = bedrooms, Bathrooms =
+bathrooms, Age = age, Price = price ) # Create data frame
+```
+
+```{r}
+cor(house_data )#pozrieme sa na korelacne koeficienty
+```
+
+Price ma vysoky koeficient s size, ine koeficienty sa blizia k nule.
+Pouzijeme metodu *postupnej eliminacie*.
+
+```{r}
+#Model 1 - vsetky premenne
+full_model <- lm(Price ~ Size + Bedrooms + Bathrooms + Age, data = house_data)
+summary(full_model)
+```
+
+Bathrooms ma vysoku p-hodnotu.
+54% sanca, ze ten vztah je nahoda.
+Preto letia von.
+Mali by sme vyhodit aj vek, ale teoreticky/logicky ocakavame vplyv, takze nechame.
+
+```{r}
+#Finalny model
+final_model <- lm(Price ~ Size + Bedrooms + Age, data = house_data)
+summary(final_model)
+```
+
+Vsetky premenne maju p \< 0.05, a F-statistika tiez.
+Adjusted R-squared: 0.9063, co je trochu vyssie ako v predchadzajucom.
+A ked tento model ma aj o 1 premennu menej, tak je lepsi (lebo je jednoduchsi).
+
+```{r}
+#overenie predpokladov
+par(mfrow = c(2, 2))
+plot(final_model)
+```
+
+Pekne grafy.
+V prvom body rovnomerne okolo nuly, nevykazuje ziaden trend.
+Q-Q kopiruju priamku -\> chyby maju normalne rozdelenie.
+Homoskedasticita: v scale-location rozdiel chyb je priblizne konstantny.
+
+Asi mam dobry model.
+
+## 2.3. Násobná regresia - dataset
+
+Urobte lineárny regresný model pre premennú mpg z datasetu mtcars, pričom prediktormi budú premenné horsepower, weight a cylinders.
+Overte predpoklady pre tento model a otestujte jeho štatistickú významnosť.
+Vizualizujte vzťah reálnych a predikovaných hodnôt pre target.
+Dávajú iné premenné z datasetu ako prediktory lepší model a ak áno, tak ktoré?
+
+```{r}
+model_mtcars <- lm(mpg ~ hp + wt + cyl, data = mtcars)
+summary(model_mtcars)
+```
+
+Statisticka vyznamnost: hp a cyl - p-honota nevyznamna, wh - ma velmi malu p-hodnotu, je vyznamna.
+To znamena, ze ak uz pozname vahu auta, informacia o vykone a valcoch nam k presnosti predpovede v tomto modeli uz takmer nic nepridava.\
+Kazdych 1000 libier váhy navyse znízi spotrebu o cca 3.17 mpg.
+
+```{r}
+par(mfrow = c(2, 2))
+plot(model_mtcars)
+```
+
+Overenie predpokladov: Cervena ciara v prvom grafe nie je uplne rovna, Potom su viditelne outliery - tieto auta su extremne úsporne a model ich podcenuje.
+Predpoklad homoskedasticityje splnený.
+Model je v poriadku ale nie je dokonaly.
+
+Potom vizualizacia:
+
+```{r}
+predikcie <- predict(model_mtcars)
+
+plot(mtcars$mpg, predikcie, 
+     main = "Realne a predikovane MPG",
+     xlab = "Realna spotreba", 
+     ylab = "Predpovedana spotreba",
+     pch = 19, col = "royalblue")
+abline(0, 1, col = "pink", lwd = 2) # ciara idealnej predpovede
+```
+
+Da sa najst lepsi model?
+
+```{r}
+# Automaticke hladanie najlepsieho modelu
+najlepsi_model <- step(lm(mpg ~ ., data = mtcars), direction = "both")
+summary(najlepsi_model)
+```
+
+V tomto modeli vsetky parametre su vyznamne a mame vyssiu presnost: Adjusted R-squared stupol z 0.826 na 0.833 Ak ma auto manualnu prevodovku (am = 1), prejde v priemere o 2.94 míle viac na galon ako automat.
+
+Zaver: Povodne navrhnuty model so speed, hp a cyl vykazoval multikolinearitu, kvoli comu sa vykon a valce javili ako nevyznamne.
+Ako lepsi sa uazal model s prediktormi wt, qsec a am.

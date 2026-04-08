@@ -1,0 +1,182 @@
+---
+title: "Zadania_3"
+author: "Daria Bozhkova"
+date: "2026-04-03"
+output: html_document
+---
+
+## 3.1. Jednoduchá logistická regresia
+
+*Vytvorme logisticky regresny model modelujúci prejdenie skúškou a spocitame korelaciu.*
+
+```{r}
+data31 <- data.frame( 
+study_hours = c(2, 3, 5, 7, 8, 10, 11, 13, 15, 16), 
+pass = c(0, 0, 0, 1, 1, 1, 1, 1, 1, 1)
+) # 0: fail, 1: pass
+
+korelacia <- cor(data31$study_hours, data31$pass, method = "spearman") #lebo jedna premenna binarna
+print(paste("Korelacia Spearmena:", round(korelacia, 4)))
+
+```
+
+*Zostrojme GLM (Generalized Linear Model):*
+
+```{r}
+model31 <- glm(pass ~ study_hours, data = data31, family = binomial) #binomial for logit
+summary(model31)
+```
+
+Estimate (vyjadruju vplyv na logit): V pripade, ze student vobec nestudoval, p-t uspechu ide k nule (Intercept hodnota je zaporna); study_hours ukazuje, ze kazda hodina studia zvacsuje sancu na uspech (logaritmus).
+
+Problem tu je v tom, ze nam ukazuje velmi velki Std.Error a p-value este aj hovori, ze faktor nie je vyznamny. Ale vykaslame na to, residual deviance blizko nuly - to je podstatne.
+
+*Vyratame confusion maticu a metriky modelu*: (Aby pochopit akost modelu porovnavame predpoklady a slutocne hodnoty)
+
+```{r}
+prob <- predict(model31, type="response") #response - S function results (0-1)
+pred_class <- ifelse(prob >= 0.5, 1, 0) 
+
+conf_matrix <- table(Actual = data31$pass, Predocted = pred_class)
+print(conf_matrix)
+
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+precision <- conf_matrix[2,2] / sum(conf_matrix[,2])
+recall <- conf_matrix[2,2] / sum(conf_matrix[2,])
+
+print(paste("Accuracy:", accuracy))
+print(paste("Precision:", round(precision, 4)))
+print(paste("Recall:", round(recall, 4)))
+```
+
+Je vidno, ze model uhadol 100% pripadov. To je pretoze data v modely su presne rozdelene: ak pocet hodin je \>= 5 - student nepresiel, ak \<= 7 - presiel.
+
+*Nakoniec ziskame odpoved na otazku "Prešiel by, na základe modelu, student, ktorý venoval príprave 6 hodín?":*
+
+```{r}
+new_student <- data.frame(study_hours = 6)
+prob_6h <- predict(model31, new_student, type = "response")
+
+print(paste("Pravdepodobnost uspesneho absolvovania pri 6 hod. :", round(prob_6h, 4)))
+
+result <- ifelse(prob_6h >= 0.5, "Prejde (1)", "Nie prejde (0)")
+print(result)
+
+```
+
+6 hodin nachadza presne uprostred medzi bodom zaruceneho neuspehu (5) a uspechu (7), model vykazuje p-t blizku 0.5. Sice hovorme, ze student skusku nezlozi, jeho vysledok je hranicny.
+
+## 3.2. Násobná logistická regresia – generované dáta
+
+*Vytvorme logistický regresný model modelujúci pravdepodobnosť kúpenia produktu (premenná purchase):*
+
+```{r}
+data32 <- data.frame( 
+  age = c(25, 30, 35, 40, 45, 50, 55, 60, 65, 70),
+  gender = factor(c("male", "female", "female", "male", "male", "female", "female", "male", "male", "female")),
+  income = c(50, 55, 60, 65, 70, 75, 80, 85, 90, 95), 
+  ad_click = c(1, 1, 0, 0, 1, 0, 1, 1, 0, 1), 
+  purchase = c(0, 0, 1, 1, 0, 1, 0, 1, 1, 0)  
+) # 0: no, 1: yes
+
+```
+
+Vizualne je vidno, ze vek koreluje s prijmom, ale vypocitame pre prehliadnost:
+
+```{r}
+cor_age_income <- cor(data32$age, data32$income)
+print(paste("Korelacia veku a prijmu:", round(cor_age_income, 4)))
+```
+
+Ano, je to tak, income = age + 25.
+
+*Dalej zostrojme model:*
+
+```{r}
+model32 <- glm(purchase ~ age + gender + income + ad_click, data = data32, family = binomial)
+summary(model32)       
+```
+
+Vzhladom na to, ze premenne age a income su v idealnej korelacii, doslo k uplnej multikolinearite. Model automaticky vylucil premennú income (NA), pretoze duplikuje informacie z premennej age.
+
+age - z vekom p-t nakupu sa zvysuje; gendermale (kladny koef.) - muzi nakupuju castejsie ako zeny; ad_click (zaporny) - kliknutie na reklamu nezvysuje (resp. zmensuje) p-t nakupu.
+
+*Teraz matica a metriky:*
+
+```{r}
+prob32 <- predict(model32, type = "response")
+pred_class32 <- ifelse(prob32 >= 0.5, 1, 0)
+
+conf_matrix32 <- table(Actual = data32$purchase, Predicted = pred_class32)
+print("Confusion Matrix:")
+print(conf_matrix32)
+
+accuracy32 <- sum(diag(conf_matrix32)) / sum(conf_matrix32)
+precision32 <- conf_matrix32[2,2] / sum(conf_matrix32[,2])
+recall32 <- conf_matrix32[2,2] / sum(conf_matrix32[2,])
+
+cat(" Accuracy:", accuracy32, "\n", 
+    "Precision:", round(precision32, 4), "\n", 
+    "Recall:", round(recall32, 4))
+```
+
+Kedze presnost, preciznost a recall dosahuju hodnotu 1, model je pre tento trenovací subor udajov idealny (opat vdaka efektu dokonaleho oddelenia).
+
+## 3.3. Násobná logistická regresia - dataset
+
+Cielom je predpovedat typ prevodovky (am) na zaklade vykonu (hp) a hmotnosti (wt). *Zostrojme model*
+
+```{r}
+model_mtcars <- glm(am ~ hp + wt, data = mtcars, family = binomial)
+summary(model_mtcars)
+```
+
+Koeficienty: wt(hmotnost) - zaporny, tazke vozidla maju castejsie automaticku prevodovku (0). Narast hmotnosty znizuje p-t manualnej prevodovky (1); hp(vykon) - kladny, sportove auta s velkym vykonom maju casto manualnu prevodovku pre lepsiu kontrolu.
+
+*Zostojme maticu:*
+
+```{r}
+prob_mtcars <- predict(model_mtcars, type = "response")
+pred_mtcars <- ifelse(prob_mtcars >= 0.5, 1, 0)
+
+conf_matrix33 <- table(Actual = mtcars$am, Predicted = pred_mtcars)
+print("Confusion Matrix:")
+print(conf_matrix32)
+
+accuracy33 <- sum(diag(conf_matrix33)) / sum(conf_matrix33)
+precision33 <- conf_matrix33[2,2] / sum(conf_matrix33[,2])
+recall33 <- conf_matrix33[2,2] / sum(conf_matrix33[2,])
+
+cat(" Accuracy:", accuracy33, "\n", 
+    "Precision:", round(precision33, 4), "\n", 
+    "Recall:", round(recall33, 4))
+
+library(pROC)
+roc_obj <- roc(mtcars$am, prob_mtcars)
+plot(roc_obj, main ="ROC Curve for mtcars Model")
+print(paste("AUC:", auc(roc_obj)))
+```
+
+**- Sú v danom datasete premenné, ktoré dávajú lepší model a ak áno, ktoré to sú?** Je to tricky question, lebo model uz je sikovny (AUC \> 0.98).
+
+```{r}
+full_model <- glm(am ~ ., data = mtcars, family = binomial)
+best_model <- suppressWarnings(step(full_model, direction = "both", trace = FALSE))
+summary(best_model)
+```
+
+Residual deviance blizko nuly a AIC teraz 8 (ale nie 16 ako bolo v predoslom), super.
+
+```{r}
+library(pROC)
+prob_old <- predict(model_mtcars, type = "response")
+auc_old <- auc(roc(mtcars$am, prob_old))
+
+prob_new <- predict(best_model, type = "response")
+auc_new <- auc(roc(mtcars$am, prob_new))
+
+print(paste("AUC mojho modelu:", round(auc_old, 4)))
+print(paste("AUC modelu po step():", round(auc_new, 4)))
+```
+
+Ano, je mozne najst lepsi model, a to je model s pouzitim qsec + gear + carb.
